@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunknuke_website=self.webpackChunknuke_website||[]).push([[2535],{45641:function(e){e.exports=JSON.parse('{"title":"Recent posts","items":[{"title":"Introducing the New Website","permalink":"/blog/2022/06/15/new-website"}]}')}}]);
