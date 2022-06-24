@@ -5,8 +5,34 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [vNext]
-- Added GitHub Actions support for submodules and fetch-depth
-- Added AppVeyor support for submodules
+
+## [6.1.1] / 2022-06-21
+- Fixed output encoding in `Nuke.GlobalTool` to be UTF-8
+- Fixed telemetry to handle Git repositories without remote
+- Fixed `GitRepository.HttpsUrl` and `SshUrl` when `Endpoint` is null
+- Fixed `ShutdownDotNetServerBuildAttribute` to timeout after 15 seconds
+
+## [6.1.0] / 2022-06-14
+- Removed extended setup wizard
+- Changed `Nuke.GlobalTool` to use `Spectre.Console`
+- Deprecated `CheckBuildProjectConfigurationsAttribute`
+- Added single-file packaging and execution
+- Added output customization via `NukeBuild.WriteLogo`, `WriteTarget`, and `WriteSummary`
+- Added second-chance registration for MSBuild from .NET CLI
+- Added submodule support in GitHub Actions, Space Automation, and AppVeyor
+- Added `NukeBuild.BuildAssemblyFile` property
+- Added generic `EnvironmentInfo.SetVariable`
+- Added support for Bitbucket
+- Added GitHub Actions support for `fetch-depth`
+- Fixed `default_target` replacement in help text
+- Fixed parameter padding and line breaks in help text
+- Fixed `Assert` methods to accept `IReadOnlyCollection`
+- Fixed fatal failure of `MSBuildLocator`
+- Fixed missing MSBuild registration when using `ProjectExtensions`
+- Fixed `NuGetPackageResolver` performance by reading metadata from `.nuspec` files
+- Fixed `GitRepository` initialization when remote is not set
+- Fixed exception for duplicated keys in TeamCity property files
+- Fixed missing arguments for `DotNetTasks`
 
 ## [6.0.3] / 2022-05-02
 - Fixed exception handling in various places
@@ -915,7 +941,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added CLT tasks for Git
 - Fixed background color in console output
 
-[vNext]: https://github.com/nuke-build/nuke/compare/6.0.3...HEAD
+[vNext]: https://github.com/nuke-build/nuke/compare/6.1.1...HEAD
+[6.1.1]: https://github.com/nuke-build/nuke/compare/6.1.0...6.1.1
+[6.1.0]: https://github.com/nuke-build/nuke/compare/6.0.3...6.1.0
 [6.0.3]: https://github.com/nuke-build/nuke/compare/6.0.2...6.0.3
 [6.0.2]: https://github.com/nuke-build/nuke/compare/6.0.1...6.0.2
 [6.0.1]: https://github.com/nuke-build/nuke/compare/6.0.0...6.0.1

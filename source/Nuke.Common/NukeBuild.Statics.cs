@@ -24,8 +24,9 @@ namespace Nuke.Common
             TemporaryDirectory = GetTemporaryDirectory(RootDirectory);
             FileSystemTasks.EnsureExistingDirectory(TemporaryDirectory);
 
-            BuildAssemblyDirectory = GetBuildAssemblyDirectory();
-            BuildAssembly = GetBuildAssembly();
+            BuildAssemblyFile = GetBuildAssemblyFile();
+            BuildAssemblyDirectory = BuildAssemblyFile?.Parent;
+
             BuildProjectFile = GetBuildProjectFile(BuildAssemblyDirectory);
             BuildProjectDirectory = BuildProjectFile?.Parent;
 
@@ -41,21 +42,21 @@ namespace Nuke.Common
         public static AbsolutePath RootDirectory { get; }
 
         /// <summary>
-        /// Gets the full path to the temporary directory <c>/.tmp</c>.
+        /// Gets the full path to the temporary directory <c>/.nuke/temp</c>.
         /// </summary>
         public static AbsolutePath TemporaryDirectory { get; }
 
         /// <summary>
-        /// Gets the full path to the build assembly directory, or <c>null</c>.
+        /// Gets the full path to the build assembly file.
+        /// </summary>
+        [CanBeNull]
+        public static AbsolutePath BuildAssemblyFile { get; }
+
+        /// <summary>
+        /// Gets the full path to the build assembly directory.
         /// </summary>
         [CanBeNull]
         public static AbsolutePath BuildAssemblyDirectory { get; }
-
-        /// <summary>
-        /// Gets the full path to the build assembly, or <c>null</c>.
-        /// </summary>
-        [CanBeNull]
-        public static AbsolutePath BuildAssembly { get; }
 
         /// <summary>
         /// Gets the full path to the build project directory, or <c>null</c>
@@ -92,7 +93,7 @@ namespace Nuke.Common
         public static bool IsServerBuild => Host is IBuildServer;
 
         internal static bool IsLocalAndEntryExecution => IsLocalBuild && !IsDockerExecution;
-        
+
         private static AbsolutePath GetRootDirectory()
         {
             var parameterValue = EnvironmentInfo.GetParameter(() => RootDirectory);
@@ -111,23 +112,21 @@ namespace Nuke.Common
         }
 
         [CanBeNull]
-        private static AbsolutePath GetBuildAssembly()
+        private static AbsolutePath GetBuildAssemblyFile()
         {
             var entryAssembly = Assembly.GetEntryAssembly();
-            if (entryAssembly == null || entryAssembly.Location.IsNullOrEmpty() || entryAssembly.GetTypes().All(x => !x.IsSubclassOf(typeof(NukeBuild))))
+            if (entryAssembly == null || entryAssembly.GetTypes().All(x => !x.IsSubclassOf(typeof(NukeBuild))))
+            {
+                var assemblyName = entryAssembly?.GetName().Name;
+                Assert.True(assemblyName is "ReSharperTestRunner" or "testhost", $"Assembly name was {assemblyName.SingleQuote()}");
                 return null;
+            }
 
-            return (AbsolutePath) entryAssembly.Location.NotNull();
-        }
+            var assemblyLocation = entryAssembly.Location;
+            var invokedLocation = Environment.GetCommandLineArgs().First();
+            Assert.True(assemblyLocation == string.Empty || assemblyLocation == invokedLocation);
 
-        [CanBeNull]
-        private static AbsolutePath GetBuildAssemblyDirectory()
-        {
-            var assembly = GetBuildAssembly();
-            if (assembly == null)
-                return null;
-
-            return (AbsolutePath) Path.GetDirectoryName(assembly).NotNull();
+            return (AbsolutePath) (assemblyLocation != string.Empty ? assemblyLocation : invokedLocation);
         }
 
         [CanBeNull]
