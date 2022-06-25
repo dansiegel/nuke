@@ -30,6 +30,8 @@ namespace Nuke.Common.Execution
         public PropertyInfo Target { get; }
         public NukeBuild Build { get; }
 
+        internal Func<bool> Intercept { get; set; }
+
         internal string Description { get; set; }
         internal List<Expression<Func<bool>>> DynamicConditions { get; } = new List<Expression<Func<bool>>>();
         internal List<Expression<Func<bool>>> StaticConditions { get; } = new List<Expression<Func<bool>>>();
@@ -48,7 +50,6 @@ namespace Nuke.Common.Execution
         internal int? PartitionSize { get; private set; }
         internal List<string> ArtifactProducts { get; } = new List<string>();
         internal LookupTable<Target, string[]> ArtifactDependencies { get; } = new LookupTable<Target, string[]>();
-        internal ExecuteInDockerSettings ExecuteInDockerSettings { get; private set; }
 
         ITargetDefinition ITargetDefinition.Description(string description)
         {
@@ -283,12 +284,6 @@ namespace Nuke.Common.Execution
         {
             Assert.True(size > 1);
             PartitionSize = size;
-            return this;
-        }
-
-        public ITargetDefinition DockerRun(Configure<ExecuteInDockerSettings> configure)
-        {
-            ExecuteInDockerSettings = configure.InvokeSafe(new ExecuteInDockerSettings());
             return this;
         }
 

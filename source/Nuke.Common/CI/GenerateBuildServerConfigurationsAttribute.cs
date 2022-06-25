@@ -17,7 +17,7 @@ namespace Nuke.Common.CI
     {
         public void OnBuildCreated(NukeBuild build, IReadOnlyCollection<ExecutableTarget> executableTargets)
         {
-            if (NukeBuild.IsDockerExecution)
+            if (NukeBuild.IsInterceptorExecution)
                 return;
             
             var configurationId = EnvironmentInfo.GetParameter<string>(ConfigurationParameterName);

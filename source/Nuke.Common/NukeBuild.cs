@@ -196,7 +196,7 @@ namespace Nuke.Common
         /// </summary>
         public int? ExitCode { get; set; }
 
-        internal static bool IsDockerExecution => Environment.GetEnvironmentVariable(DockerExecutor.RunningInDockerEnvironmentVariable) == "1";
+        internal static bool IsInterceptorExecution => Environment.GetEnvironmentVariable(InterceptorEnvironmentKey) == "1";
 
         public void ReportSummary(Configure<IDictionary<string, string>> configurator = null)
         {

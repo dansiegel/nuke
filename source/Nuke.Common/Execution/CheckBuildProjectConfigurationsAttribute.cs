@@ -27,7 +27,7 @@ namespace Nuke.Common.Execution
             IReadOnlyCollection<ExecutableTarget> executableTargets,
             IReadOnlyCollection<ExecutableTarget> executionPlan)
         {
-            if (NukeBuild.IsDockerExecution)
+            if (NukeBuild.IsInterceptorExecution)
                 return;
             
             if (!Task.Run(CheckConfiguration).Wait(TimeoutInMilliseconds))

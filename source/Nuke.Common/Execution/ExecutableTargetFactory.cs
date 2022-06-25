@@ -44,6 +44,7 @@ namespace Nuke.Common.Execution
                                  Name = property.GetDisplayShortName(),
                                  Member = property,
                                  Definition = definition,
+                                 Intercept = definition.Intercept,
                                  Description = definition.Description,
                                  Factory = factory,
                                  IsDefault = defaultTargets.Contains(factory),
@@ -56,8 +57,7 @@ namespace Nuke.Common.Execution
                                  Actions = definition.Actions,
                                  Listed = !definition.IsInternal,
                                  PartitionSize = definition.PartitionSize,
-                                 ArtifactProducts = definition.ArtifactProducts,
-                                 ExecuteInDockerSettings = definition.ExecuteInDockerSettings
+                                 ArtifactProducts = definition.ArtifactProducts
                              };
             }
 

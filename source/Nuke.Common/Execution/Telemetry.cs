@@ -35,9 +35,6 @@ namespace Nuke.Common.Execution
 
         static Telemetry()
         {
-            if (NukeBuild.IsDockerExecution)
-                return;
-            
             var optoutParameter = EnvironmentInfo.GetParameter<string>(OptOutEnvironmentKey) ?? string.Empty;
             if (optoutParameter == "1" || optoutParameter.EqualsOrdinalIgnoreCase(bool.TrueString))
                 return;

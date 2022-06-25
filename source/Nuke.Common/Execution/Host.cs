@@ -52,8 +52,6 @@ namespace Nuke.Common
             return DelegateDisposable.CreateBracket(
                 () =>
                 {
-                    if (NukeBuild.IsDockerExecution)
-                        return;
                     var formattedBlockText = text
                         .Split(new[] { EnvironmentInfo.NewLine }, StringSplitOptions.None)
                         .Select(Theme.FormatInformation);
@@ -81,9 +79,6 @@ namespace Nuke.Common
 
         internal virtual void WriteSummary(NukeBuild build)
         {
-            if (NukeBuild.IsDockerExecution)
-                return;
-            
             WriteSevereLogEvents(Logging.InMemorySink.Instance.LogEvents);
             WriteSummaryTable(build);
 

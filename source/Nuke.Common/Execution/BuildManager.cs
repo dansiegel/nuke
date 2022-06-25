@@ -48,12 +48,10 @@ namespace Nuke.Common.Execution
                 ToolPathResolver.NuGetPackagesConfigFile = build.NuGetPackagesConfigFile;
                 ToolPathResolver.NuGetAssetsConfigFile = build.NuGetAssetsConfigFile;
 
-                if (!NukeBuild.IsDockerExecution)
+                if (!NukeBuild.IsInterceptorExecution)
                 {
                     if (!build.NoLogo)
-                        NukeBuild.Host.WriteLogo();
-
-                    build.WriteLogo();
+                        build.WriteLogo();
                 }
 
                 build.ExecutionPlan = ExecutionPlanner.GetExecutionPlan(

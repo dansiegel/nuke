@@ -225,11 +225,6 @@ namespace Nuke.Common
         ///   Defines the partition size. Default is <c>1</c>.
         /// </summary>
         ITargetDefinition Partition(int size);
-
-        /// <summary>
-        /// Execute this step within a docker container
-        /// </summary>
-        ITargetDefinition DockerRun(Configure<ExecuteInDockerSettings> configure);
     }
 
     /// <summary>

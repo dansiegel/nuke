@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using JetBrains.Annotations;
 using Nuke.Common;
 using Nuke.Common.Tooling;
+using Nuke.Common.Tools.Docker;
 using Serilog;
 
 partial class Build
@@ -16,15 +17,15 @@ partial class Build
         .DockerRun(_ => _
             .SetImage("mcr.microsoft.com/dotnet/sdk:6.0")
             .When(RuntimeInformation.OSArchitecture == Architecture.Arm64, _ => _
-                .SetDockerPlatform("linux/arm64")
-                .SetDotNetPublishRuntime("linux-arm64"))
+                .SetPlatform("linux/arm64")
+                .SetDotNetRuntime("linux-arm64"))
             .When(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) , _ => _
-                .SetDockerPlatform("windows/amd64")
-                .SetDotNetPublishRuntime("win-x64"))
+                .SetPlatform("windows/amd64")
+                .SetDotNetRuntime("win-x64"))
             //this next "when" block isn't strictly necessary, as these are the defaults
             .When(RuntimeInformation.IsOSPlatform(OSPlatform.Linux) , _ => _
-                .SetDockerPlatform("linux/amd64")
-                .SetDotNetPublishRuntime("linux-x64"))
+                .SetPlatform("linux/amd64")
+                .SetDotNetRuntime("linux-x64"))
         )
         .Executes(() =>
         {

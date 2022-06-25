@@ -92,7 +92,7 @@ namespace Nuke.Common
         public static bool IsLocalBuild => !IsServerBuild;
         public static bool IsServerBuild => Host is IBuildServer;
 
-        internal static bool IsLocalAndEntryExecution => IsLocalBuild && !IsDockerExecution;
+        internal static bool IsLocalAndEntryExecution => IsLocalBuild && !IsInterceptorExecution;
 
         private static AbsolutePath GetRootDirectory()
         {

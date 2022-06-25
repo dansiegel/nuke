@@ -17,7 +17,7 @@ namespace Nuke.Common.Execution
     {
         public void OnBuildCreated(NukeBuild build, IReadOnlyCollection<ExecutableTarget> executableTargets)
         {
-            if (NukeBuild.IsLocalAndEntryExecution && ShouldNotify)
+            if (ShouldNotify)
             {
                 Notify();
                 Host.Information("Press any key to continue without update ...");
@@ -31,7 +31,8 @@ namespace Nuke.Common.Execution
                 Notify();
         }
 
-        private bool ShouldNotify => !Directory.Exists(GetNukeDirectory(NukeBuild.RootDirectory));
+        private bool ShouldNotify => !Directory.Exists(GetNukeDirectory(NukeBuild.RootDirectory)) &&
+                                     !NukeBuild.IsLocalAndEntryExecution;
 
         private static void Notify()
         {
