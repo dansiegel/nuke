@@ -24,12 +24,13 @@ namespace Nuke.Common.Execution
     {
         public static readonly LoggingLevelSwitch LevelSwitch = new LoggingLevelSwitch();
 
-        internal static IHostTheme DefaultTheme { get; } =
-            Environment.GetEnvironmentVariable("TERM") is { } term && term.StartsWithOrdinalIgnoreCase("xterm")
+        internal static bool SupportsAnsiOutput => Environment.GetEnvironmentVariable("TERM") is { } term && term.StartsWithOrdinalIgnoreCase("xterm");
+        internal static IHostTheme DefaultTheme { get; } = SupportsAnsiOutput
                 ? AnsiConsoleHostTheme.Default256AnsiColorTheme
                 : SystemConsoleHostTheme.DefaultSystemColorTheme;
 
-        internal static string DefaultOutputTemplate => "[{Level:u3}] {Message:l}{NewLine}{Exception}";
+        internal static string StandardOutputTemplate => "[{Level:u3}] {Message:l}{NewLine}{Exception}";
+        internal static string TimestampOutputTemplate => $"{{Timestamp:HH:mm:ss}} {StandardOutputTemplate}";
 
         private const int TargetNameLength = 20;
 
@@ -83,7 +84,7 @@ namespace Nuke.Common.Execution
         {
             return configuration
                 .WriteTo.Console(
-                    outputTemplate: build != null ? NukeBuild.Host.OutputTemplate : DefaultOutputTemplate,
+                    outputTemplate: build != null && !NukeBuild.IsInterceptorExecution ? NukeBuild.Host.OutputTemplate : StandardOutputTemplate,
                     theme: (ConsoleTheme)(build != null ? NukeBuild.Host.Theme : DefaultTheme),
                     applyThemeToRedirectedOutput: true,
                     levelSwitch: LevelSwitch);
@@ -112,7 +113,6 @@ namespace Nuke.Common.Execution
             if (build == null || NukeBuild.Host is IBuildServer)
                 return configuration;
 
-            // when nuke runs a target in docker, the file is locked by the outer invocation and nuke silently fails
             if (NukeBuild.IsInterceptorExecution)
                 return configuration;
 

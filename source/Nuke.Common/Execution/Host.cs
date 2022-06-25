@@ -30,7 +30,7 @@ namespace Nuke.Common
 
         internal virtual IHostTheme Theme => Logging.DefaultTheme;
 
-        internal virtual string OutputTemplate => DefaultOutputTemplate;
+        internal virtual string OutputTemplate => Logging.TimestampOutputTemplate;
 
         protected internal void WriteLogo()
         {
@@ -98,7 +98,7 @@ namespace Nuke.Common
             {
                 Log.Logger = new LoggerConfiguration()
                     .WriteTo.Console(
-                        outputTemplate: SevereMessagesOutputTemplate,
+                        outputTemplate: Logging.StandardOutputTemplate,
                         theme: (ConsoleTheme)Theme,
                         applyThemeToRedirectedOutput: true)
                     .CreateLogger();
