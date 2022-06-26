@@ -16,14 +16,15 @@ partial class Build
     Target RunTargetInDockerImageTest => _ => _
         .DockerRun(_ => _
             .SetImage("mcr.microsoft.com/dotnet/sdk:6.0")
-            .When(RuntimeInformation.OSArchitecture == Architecture.Arm64, _ => _
+            .SetImage("node:latest")
+            .When(EnvironmentInfo.IsArm64, _ => _
                 .SetPlatform("linux/arm64")
                 .SetDotNetRuntime("linux-arm64"))
-            .When(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) , _ => _
+            .When(EnvironmentInfo.IsWin, _ => _
                 .SetPlatform("windows/amd64")
                 .SetDotNetRuntime("win-x64"))
             //this next "when" block isn't strictly necessary, as these are the defaults
-            .When(RuntimeInformation.IsOSPlatform(OSPlatform.Linux) , _ => _
+            .When(EnvironmentInfo.IsLinux, _ => _
                 .SetPlatform("linux/amd64")
                 .SetDotNetRuntime("linux-x64"))
         )

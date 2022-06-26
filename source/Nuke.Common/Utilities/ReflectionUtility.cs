@@ -190,6 +190,7 @@ namespace Nuke.Common.Utilities
                     }
                 }
 
+                // Note: _Probably_ for members that are only 'new' in implementation
                 // if (filterQuasiOverridden && classMember != null && classMember.IsPublic())
                 // {
                 //     removeMembers.AddRange(interfaceMembers);
