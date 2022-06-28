@@ -4,11 +4,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using JetBrains.Annotations;
-using Newtonsoft.Json;
 using Nuke.Common.Execution;
 using Nuke.Common.IO;
 using Nuke.Common.Tooling;
@@ -18,15 +17,20 @@ using Nuke.Common.Utilities;
 using Nuke.Common.Utilities.Collections;
 using Nuke.Common.ValueInjection;
 using Serilog;
+using Serilog.Formatting.Compact.Reader;
 using static Nuke.Common.Tools.Docker.DockerTasks;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
 namespace Nuke.Common;
 
+[PublicAPI]
 public static class TargetDefinitionExtensions
 {
-    private static readonly AbsolutePath WindowsBuildDirectory = (AbsolutePath)@"C:\nuke";
-    private static readonly AbsolutePath UnixBuildDirectory = (AbsolutePath)@"/nuke";
+    private static readonly AbsolutePath WindowsRootDirectory = (AbsolutePath)@"C:\nuke";
+    private static readonly AbsolutePath WindowsNuGetDirectory = (AbsolutePath)@"C:\nuget";
+
+    private static readonly AbsolutePath UnixRootDirectory = (AbsolutePath)@"/nuke";
+    private static readonly AbsolutePath UnixNuGetDirectory = (AbsolutePath)@"/nuget";
 
     /// <summary>
     /// Execute this target within a Docker container
@@ -40,56 +44,93 @@ public static class TargetDefinitionExtensions
                 return false;
 
             var settings = configurator.InvokeSafe(new DockerRunTargetSettings());
-            Assert.NotNull(settings.DotNetRuntime);
-            Assert.NotNull(settings.Platform);
+            settings.DotNetRuntime.NotNull();
+            settings.Platform.NotNull();
 
             var buildAssemblyDirectory = NukeBuild.BuildAssemblyDirectory.NotNull().Parent / settings.DotNetRuntime;
             var buildAssembly = buildAssemblyDirectory / NukeBuild.BuildAssemblyFile.NotNull().NameWithoutExtension;
 
-            FileSystemTasks.EnsureCleanDirectory(buildAssemblyDirectory);
+            bool IsUpToDate() => NukeBuild.BuildAssemblyDirectory.GlobFiles("*.dll")
+                .Select(x => NukeBuild.BuildAssemblyDirectory.GetRelativePathTo(x))
+                .All(x => File.Exists(buildAssemblyDirectory / x) &&
+                          File.GetLastWriteTime(buildAssemblyDirectory / x) >= File.GetLastWriteTime(NukeBuild.BuildAssemblyDirectory / x));
 
-            Log.Information("Preparing build executable for {DotNetRuntime}...", $".NET {settings.DotNetRuntime}");
-            DotNetPublish(p => p
-                .SetProject(NukeBuild.BuildProjectFile)
-                .SetOutput(buildAssemblyDirectory)
-                .SetVerbosity(DotNetVerbosity.Quiet)
-                .EnableNoLogo()
-                .SetRuntime(settings.DotNetRuntime)
-                .EnableSelfContained()
-                .DisableProcessLogInvocation()
-                .DisableProcessLogOutput());
-
-            // TODO: how should PullImage work?
-            try
+            if ((!settings.BuildCaching ?? true) || !IsUpToDate())
             {
-                Docker($"image inspect {settings.Image}", logInvocation: false, logOutput: false);
+                Log.Information("Preparing build executable for {DotNetRuntime}...", settings.DotNetRuntime);
+                DotNetPublish(p => p
+                    .SetProject(NukeBuild.BuildProjectFile)
+                    .SetOutput(buildAssemblyDirectory)
+                    .SetRuntime(settings.DotNetRuntime)
+                    .EnableSelfContained()
+                    .DisableProcessLogInvocation()
+                    .DisableProcessLogOutput());
             }
-            catch
+            else
+            {
+                Log.Information("Reusing previously compiled build executable for {DotNetRuntime}...", settings.DotNetRuntime);
+            }
+
+            if (settings.PullImage ?? false)
             {
                 Log.Information("Pulling image {Image}...", settings.Image);
                 Docker($"pull {settings.Image}", logInvocation: false, logOutput: false);
             }
 
-            var workingDirectory = settings.Platform.StartsWithOrdinalIgnoreCase("win") ? WindowsBuildDirectory : UnixBuildDirectory;
-            var envFile = buildAssemblyDirectory / $".env.{definition.Target.Name}";
-            File.WriteAllLines(envFile, GetEnvironmentVariables(workingDirectory).Select(x => $"{x.Key}={x.Value}"));
+            var (rootDirectory, nugetDirectory) = settings.Platform.StartsWithOrdinalIgnoreCase("win")
+                ? (WindowsRootDirectory, WindowsNuGetDirectory)
+                : (UnixRootDirectory, UnixNuGetDirectory);
+            var localTempDirectory = NukeBuild.TemporaryDirectory / "docker" / definition.Name;
+            var tempDirectory = rootDirectory / NukeBuild.RootDirectory.GetRelativePathTo(localTempDirectory);
+            var envFile = buildAssemblyDirectory / $".env.{definition.Name}";
+            var environmentVariables = GetEnvironmentVariables(settings, rootDirectory, tempDirectory);
 
-            Log.Information("Launching target in {Image}...", settings.Image);
+            File.WriteAllLines(envFile, environmentVariables.Select(x => $"{x.Key}={x.Value}"));
+            FileSystemTasks.EnsureCleanDirectory(localTempDirectory);
 
-            DockerTasks.DockerRun(_ => settings
-                // Allow option to --rm after build
-                .EnableRm()
-                .AddVolume($"{NukeBuild.RootDirectory}:{workingDirectory}")
-                .AddVolume($"{NuGetPackageResolver.GetPackagesDirectory(ToolPathResolver.NuGetPackagesConfigFile)}:/nuget")
-                .SetPlatform(settings.Platform)
-                .SetWorkdir(workingDirectory)
-                .SetEnvFile(envFile)
-                .SetEntrypoint(workingDirectory / NukeBuild.RootDirectory.GetRelativePathTo(buildAssembly))
-                .SetArgs(new[]
-                         {
-                             definition.Target.Name,
-                             $"--{ParameterService.GetParameterDashedName(Constants.SkippedTargetsParameterName)}"
-                         }.Concat(settings.Args)));
+            if (!settings.Username.IsNullOrEmpty())
+            {
+                Log.Information("Logging into {Server}...", settings.Server);
+                DockerLogin(_ => _
+                    .SetUsername(settings.Username)
+                    .SetPassword(settings.Password)
+                    .SetServer(settings.Server)
+                    .DisableProcessLogInvocation()
+                    .DisableProcessLogOutput());
+            }
+
+            IDisposable AdaptLogging(Action<OutputType, string> previousLogger)
+                => DelegateDisposable.CreateBracket(
+                    () => DockerLogger = (_, message) => Log.Write(LogEventReader.ReadFromString(message)),
+                    () => DockerLogger = previousLogger);
+
+            try
+            {
+                using (AdaptLogging(previousLogger: DockerLogger))
+                {
+                    Log.Information("Launching target in {Image}...", settings.Image);
+                    DockerTasks.DockerRun(_ => settings
+                        .When(!settings.Rm.HasValue, _ => _
+                            .EnableRm())
+                        .AddVolume($"{NukeBuild.RootDirectory}:{rootDirectory}")
+                        .AddVolume($"{NuGetPackageResolver.GetPackagesDirectory(ToolPathResolver.NuGetPackagesConfigFile)}:{nugetDirectory}")
+                        .SetPlatform(settings.Platform)
+                        .SetWorkdir(rootDirectory)
+                        .SetEnvFile(envFile)
+                        .SetEntrypoint(rootDirectory / NukeBuild.RootDirectory.GetRelativePathTo(buildAssembly))
+                        .SetArgs(new[]
+                        {
+                            definition.Target.Name,
+                            $"--{ParameterService.GetParameterDashedName(Constants.SkippedTargetsParameterName)}"
+                        }.Concat(settings.Args))
+                        .DisableProcessLogInvocation());
+                }
+            }
+            finally
+            {
+                if (!settings.KeepEnvFile ?? true)
+                    File.Delete(envFile);
+            }
 
             return true;
         };
@@ -97,73 +138,44 @@ public static class TargetDefinitionExtensions
         return definition;
     }
 
-    private static IReadOnlyDictionary<string, string> GetEnvironmentVariables(AbsolutePath workingDirectory)
+    private static IReadOnlyDictionary<string, string> GetEnvironmentVariables(
+        ToolSettings settings,
+        AbsolutePath rootDirectory,
+        AbsolutePath tempDirectory)
     {
-        return new Dictionary<string, string>()
+        var customEnvironmentVariables = new Dictionary<string, string>()
             .AddPair(Constants.InterceptorEnvironmentKey, value: 1)
+            // Note: Add this explicitly to avoid loss through clearing of environment variables on user side
             .AddPairWhenValueNotNull("TERM", Logging.SupportsAnsiOutput ? "xterm" : null)
+            .AddPair("NUKE_ROOT", rootDirectory)
             .AddPair("NUGET_PACKAGES", "/nuget")
             .AddPair("DOTNET_SKIP_FIRST_TIME_EXPERIENCE", value: 1)
             .AddPair("DOTNET_CLI_TELEMETRY_OPTOUT", value: 1)
-            // TODO: what's this?
-            .AddPair("DOTNET_CLI_HOME", workingDirectory)
-            // TODO: sure this needs to be set?
-            .AddPair("TEMP", workingDirectory / NukeBuild.RootDirectory.GetRelativePathTo(NukeBuild.TemporaryDirectory))
-            .AddPair("TMP", workingDirectory / NukeBuild.RootDirectory.GetRelativePathTo(NukeBuild.TemporaryDirectory))
+            .AddPair("DOTNET_CLI_HOME", rootDirectory)
+            .AddPair("TEMP", tempDirectory)
+            .AddPair("TMP", tempDirectory)
             // Otherwise: Failed to create CoreCLR, HRESULT: 0x80004005
             // https://github.com/actions/runner/issues/619
-            .AddPair("COMPlus_EnableDiagnostics", value: 0)
-            .AddDictionary(EnvironmentInfo.Variables
+            .AddPair("COMPlus_EnableDiagnostics", value: 0);
+
+        var excludedEnvironmentVariables =
+            new[]
+            {
+                "APPDATA",
+                "HOMEPATH",
+                "LOCALAPPDATA",
+                "USERNAME",
+                "USERPROFILE",
+            };
+
+        return customEnvironmentVariables
+            .AddDictionary(settings.ProcessEnvironmentVariables
                 .Where(x =>
+                    !customEnvironmentVariables.Keys.Contains(x.Key, StringComparer.OrdinalIgnoreCase) &&
+                    // TODO: Copy from TeamCity?
                     !x.Key.Contains(' ') &&
-                    x.Key.EqualsAnyOrdinalIgnoreCase(
-                        "USERPROFILE",
-                        "USERNAME",
-                        "LOCALAPPDATA",
-                        "APPDATA",
-                        "TEMP",
-                        "TMP",
-                        "HOMEPATH"
-                    ))
-                .ToDictionary(x => x.Key, x => x.Value).AsReadOnly()).AsReadOnly();
-    }
-}
-
-[PublicAPI]
-[ExcludeFromCodeCoverage]
-[Serializable]
-public class DockerRunTargetSettings : DockerRunSettings
-{
-    //todo: mattr: consider supporting credentials for the docker feed
-    //todo: mattr: consider supporting additional env vars
-    //todo: mattr: consider supporting a "dont pass any env vars" mode
-    //todo: mattr: consider if there's a solid use case for "args""
-    //todo: mattr: consider if we need entrypoint? 
-
-    /// <summary>
-    /// Whether to execute a `docker pull` before running the container. 
-    /// </summary>
-    public virtual bool PullImage { get; internal set; }
-
-    /// <summary>
-    /// The .NET Runtime Identifier (<see ref="https://docs.microsoft.com/en-us/dotnet/core/rid-catalog">RID</see>) to use to publish the Nuke project.
-    /// For example, `linux-x64`, `linux-arm64`, `win-x64` etc.
-    /// </summary>
-    public virtual string DotNetRuntime { get; internal set; }
-
-    [Pure]
-    public DockerRunTargetSettings SetPullImage(bool pullImage)
-    {
-        var settings = this.NewInstance();
-        settings.PullImage = pullImage;
-        return settings;
-    }
-
-    [Pure]
-    public DockerRunTargetSettings SetDotNetRuntime(string rid)
-    {
-        var settings = this.NewInstance();
-        settings.DotNetRuntime = rid;
-        return settings;
+                    !x.Key.EqualsAnyOrdinalIgnoreCase(excludedEnvironmentVariables))
+                .ToDictionary(x => x.Key, x => x.Value).AsReadOnly())
+            .ToImmutableSortedDictionary();
     }
 }

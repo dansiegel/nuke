@@ -28,6 +28,7 @@ namespace Nuke.Common.Execution
         }
 
         public PropertyInfo Target { get; }
+        public string Name => Target.GetDisplayShortName();
         public NukeBuild Build { get; }
 
         internal Func<bool> Intercept { get; set; }

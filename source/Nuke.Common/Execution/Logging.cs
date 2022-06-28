@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JetBrains.Annotations;
+using Newtonsoft.Json;
 using Nuke.Common.CI;
 using Nuke.Common.Execution.Theming;
 using Nuke.Common.IO;
@@ -15,6 +16,8 @@ using Nuke.Common.Utilities.Collections;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
+using Serilog.Formatting;
+using Serilog.Formatting.Compact;
 using Serilog.Sinks.SystemConsole.Themes;
 
 namespace Nuke.Common.Execution
@@ -29,6 +32,7 @@ namespace Nuke.Common.Execution
                 ? AnsiConsoleHostTheme.Default256AnsiColorTheme
                 : SystemConsoleHostTheme.DefaultSystemColorTheme;
 
+        internal static string RepeatedIssueOutputTemplate => "[{Level:u3}] {ExecutingTarget}: {Message:l}{NewLine}";
         internal static string StandardOutputTemplate => "[{Level:u3}] {Message:l}{NewLine}{Exception}";
         internal static string TimestampOutputTemplate => $"{{Timestamp:HH:mm:ss}} {StandardOutputTemplate}";
 
@@ -56,6 +60,14 @@ namespace Nuke.Common.Execution
 
         public static void Configure(NukeBuild build = null)
         {
+            if (NukeBuild.IsInterceptorExecution)
+            {
+                Log.Logger = new LoggerConfiguration()
+                    .WriteTo.Console(new CompactJsonFormatter())
+                    .CreateLogger();
+                return;
+            }
+
             if (build != null)
                 DeleteOldLogFiles();
 
@@ -84,7 +96,7 @@ namespace Nuke.Common.Execution
         {
             return configuration
                 .WriteTo.Console(
-                    outputTemplate: build != null && !NukeBuild.IsInterceptorExecution ? NukeBuild.Host.OutputTemplate : StandardOutputTemplate,
+                    outputTemplate: build != null ? NukeBuild.Host.OutputTemplate : StandardOutputTemplate,
                     theme: (ConsoleTheme)(build != null ? NukeBuild.Host.Theme : DefaultTheme),
                     applyThemeToRedirectedOutput: true,
                     levelSwitch: LevelSwitch);
@@ -111,9 +123,6 @@ namespace Nuke.Common.Execution
         public static LoggerConfiguration ConfigureFiles(this LoggerConfiguration configuration, [CanBeNull] NukeBuild build)
         {
             if (build == null || NukeBuild.Host is IBuildServer)
-                return configuration;
-
-            if (NukeBuild.IsInterceptorExecution)
                 return configuration;
 
             var buildLogFile = NukeBuild.TemporaryDirectory / "build.log";

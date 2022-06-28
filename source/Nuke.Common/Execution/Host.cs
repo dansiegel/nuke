@@ -98,7 +98,7 @@ namespace Nuke.Common
             {
                 Log.Logger = new LoggerConfiguration()
                     .WriteTo.Console(
-                        outputTemplate: Logging.StandardOutputTemplate,
+                        outputTemplate: Logging.RepeatedIssueOutputTemplate,
                         theme: (ConsoleTheme)Theme,
                         applyThemeToRedirectedOutput: true)
                     .CreateLogger();
