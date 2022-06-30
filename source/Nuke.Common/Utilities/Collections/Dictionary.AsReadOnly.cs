@@ -15,5 +15,10 @@ namespace Nuke.Common.Utilities.Collections
         {
             return new ReadOnlyDictionary<TKey, TValue>(dictionary);
         }
+
+        public static IReadOnlyDictionary<TKey, TValue> AsReadOnly<TKey, TValue>(this Dictionary<TKey, TValue> dictionary)
+        {
+            return new ReadOnlyDictionary<TKey, TValue>(dictionary);
+        }
     }
 }

@@ -7,13 +7,16 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using Newtonsoft.Json;
 
 namespace Nuke.Common.Utilities.Collections
 {
     [PublicAPI]
     [Serializable]
+    [JsonConverter(typeof(RootPropertyConverter))]
     public class LookupTable<TKey, TValue> : ILookup<TKey, TValue>
     {
+        [JsonRootProperty]
         private readonly Dictionary<TKey, List<TValue>> _dictionary;
 
         public LookupTable()
@@ -42,7 +45,11 @@ namespace Nuke.Common.Utilities.Collections
 
         public int Count => Lookup.Count;
 
-        public IEnumerable<TValue> this[[NotNull] TKey key] => Lookup[key];
+        public IEnumerable<TValue> this[[NotNull] TKey key]
+        {
+            get => Lookup[key];
+            set => _dictionary[key] = value.ToList();
+        }
 
         public void Add(TKey key, TValue value)
         {
